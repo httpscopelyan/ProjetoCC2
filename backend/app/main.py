@@ -1,9 +1,6 @@
 from fastapi import FastAPI
-
+from domain.adapters.inbound.http.routes.health import router
 
 app = FastAPI()
 
-@app.get("/health")
-def read_health(): 
-    return ({"status": "Ok"})
-
+app.include_router(router)
