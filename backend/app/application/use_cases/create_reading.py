@@ -1,6 +1,9 @@
 from domain.entities.reading import Reading
 from datetime import datetime, timezone
-from adapters.outbound.persistence.repositories.sql_reading_repository import SqlReadingRepository 
+from adapters.outbound.persistence.repositories.sql_reading_repository import SqlReadingRepository
+from domain.validation.validation import validate
+
+
 async def create_reading(leitura, repository):
 
     leitura = Reading(
@@ -15,9 +18,20 @@ async def create_reading(leitura, repository):
         received_at= datetime.now()
     )
 
-    if await repository.existir(leitura.station_id, leitura.measured_at):
-        return {"error": "Leitura duplicada"}
+    if not await repository.exist(leitura.station_id): 
+        return {"error": "Esta estação não existe ou não esta cadastrada"}
 
-    await repository.salvar(leitura)
+    if await repository.duplicate(leitura.station_id, leitura.measured_at):
+        return {"error": "Leitura duplicada"}
+    
+    oldreadings = await repository.readings_oldfind(leitura.station_id, limit=10)
+
+    anterior = oldreadings[0] if oldreadings else None
+    is_valid, flags = validate(leitura, anterior, oldreadings)
+
+    leitura.is_valid = is_valid
+    leitura.flags = flags
+
+    await repository.save(leitura)
 
     return leitura
